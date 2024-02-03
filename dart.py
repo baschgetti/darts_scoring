@@ -81,14 +81,13 @@ def input_to_sum(player, temp, remaining, input_size):
 
 
 def validate_special_input():
-    regex = re.search(r"^\s*(end|del\s*[1-9]\d*|edit\s+)\s*$")
+    regex = re.search(r"^(end|del\s*[1-9]\d*|edit\s+)\s*$")
 
 
 def detect_special_input(input_string, player, temp):
     if input_string == "":
         return True
     if input_string.startswith("end"):
-        player.append_to_history(["end"], True)
         return True
     elif input_string.startswith("del"):
         number = int(input_string.split()[1])
