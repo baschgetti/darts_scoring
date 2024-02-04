@@ -29,6 +29,14 @@ def determine_redo_amount(input_string, player):
     return amount
 
 
+# -----------------------Utility-----------------------
+
+
+class State:
+    def __init__(self):
+        self.allow_redo = True
+
+
 # -----------------------Player-----------------------
 
 
@@ -144,7 +152,7 @@ def special_input_validation(input_string):
     return regex is not None
 
 
-def special_input_action(input_string, player, wait_queue, players):
+def special_input_action(input_string, player, wait_queue, players, state):
     if input_string == "":
         return True
     if input_string.startswith("end"):
@@ -163,10 +171,11 @@ def special_input_action(input_string, player, wait_queue, players):
         # TODO
         return True
     elif input_string.startswith("skip"):
-        modify_wait_queue(wait_queue, player, True)
+        modify_wait_queue(wait_queue, player, True, state)
         print(f"skipping {player.name}")
         return True
-    elif input_string.startswith("redo"):
+    elif input_string.startswith("redo") and state.allow_redo:
+        print(state.allow_redo)
         name = input_string.split()[1]
         p = find_player_with_name(players, name)
         if p is None:
@@ -178,9 +187,12 @@ def special_input_action(input_string, player, wait_queue, players):
             print("player must not be the current player and must already have played at least three (one/two "
                   "respectively when optional argument 1 or 2 is used after the name) darts.")
             return False
-        if amount >= hist_len:
+        if amount == hist_len:
             p.number_of_scores = 3
+        elif amount == 1 and hist_len == 2:
+            p.number_of_scores = 2
         wait_queue.insert(0, p)
+        state.allow_redo = False
         return True
     elif input_string.startswith("setwq"):
         new_wait_queue = []
@@ -204,10 +216,17 @@ def special_input_action(input_string, player, wait_queue, players):
 # -----------------------Game Logic-----------------------
 
 
-def modify_wait_queue(wait_queue, player, skip):
+def update_state(state: State):
+    state.allow_redo = True
+
+
+def modify_wait_queue(wait_queue, player, skip, state):
     if not player.darts_left() or skip:
+        update_state(state)
         wait_queue.pop(0)
-        if player.remaining_score > 0 and not contains(player, wait_queue):
+        if player.remaining_score == 0 and contains(player, wait_queue):
+            wait_queue.remove(player)
+        elif player.remaining_score > 0 and not contains(player, wait_queue):
             wait_queue.append(player)
 
 
@@ -238,19 +257,20 @@ def play(player, scores):
 
 
 def game():
+    state = State()
     start_score, players, wait_queue = setup()
 
     while len(wait_queue) > 0:
-        print(list(map(lambda pl: pl.name, wait_queue)))
+        # print(list(map(lambda pl: pl.name, wait_queue)))
         player = wait_queue[0]
         if player.number_of_scores <= 0:
             player.number_of_scores += 3
         input_string = input(f"{player.name} [{player.remaining_score - sum_input(player.temp)}]: ").lstrip().rstrip()
         if special_input_validation(input_string):
-            special_input_action(input_string, player, wait_queue, players)
+            special_input_action(input_string, player, wait_queue, players, state)
         elif regular_input_validation(player, input_string):
             play(player, regular_input_to_scores(input_string))
-            modify_wait_queue(wait_queue, player, False)
+            modify_wait_queue(wait_queue, player, False, state)
             if player.is_finished():
                 print(f"{player.name} has finished at position "
                       f"{list(map(lambda pl: pl.is_finished(), players)).count(True)} "
