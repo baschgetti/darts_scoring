@@ -18,6 +18,17 @@ def empty_list(list_empty):
         list_empty.pop()
 
 
+def contains(element, search_list):
+    return any(list(map(lambda e: e == element, search_list)))
+
+
+def determine_redo_amount(input_string, player):
+    amount = (len(player.history) + 2) % 3 + 1
+    if len(input_string.split()) > 2:
+        amount = min(amount, int(input_string.split()[2]))
+    return amount
+
+
 # -----------------------Player-----------------------
 
 
@@ -43,7 +54,7 @@ class Player:
 
     def strip_history(self, amount):
         temp_len, hist_len = len(self.temp), len(self.history)
-        if amount > temp_len + hist_len:
+        if amount > temp_len + hist_len or amount == 0:
             return False
         self.temp = self.temp[:-min(amount, temp_len)]
         if amount > temp_len:
@@ -129,7 +140,7 @@ def regular_input_to_scores(input_string):
 
 
 def special_input_validation(input_string):
-    regex = re.search(r"^(del\s+[1-9]\d*|end|skip|next\s+.*|setwq\s+(.*)*)\s*$", input_string)
+    regex = re.search(r"^(del\s+[1-9]\d*|end|skip|redo\s+.*(\s+[12])?|setwq\s+(.*)*)\s*$", input_string)
     return regex is not None
 
 
@@ -139,7 +150,8 @@ def special_input_action(input_string, player, wait_queue, players):
     if input_string.startswith("end"):
         wait_queue.pop(0)
         append_temp_to_history(player, True)
-        print(f"{player.name} has chosen to withdraw with a remaining score of {player.start_score - sum_input(player.history)}")
+        print(f"{player.name} has chosen to withdraw with a remaining score of "
+              f"{player.start_score - sum_input(player.history)}")
         return True
     elif input_string.startswith("del"):
         amount = int(input_string.split()[1])
@@ -151,32 +163,36 @@ def special_input_action(input_string, player, wait_queue, players):
         # TODO
         return True
     elif input_string.startswith("skip"):
-        wait_queue.append(wait_queue.pop(0))
+        modify_wait_queue(wait_queue, player, True)
         print(f"skipping {player.name}")
         return True
-    elif input_string.startswith("next"):
+    elif input_string.startswith("redo"):
         name = input_string.split()[1]
-        player = find_player_with_name(players, name)
-        if player is None:
+        p = find_player_with_name(players, name)
+        if p is None:
             print("invalid name")
             return False
-        wait_queue.insert(0, player)
-        if player.number_of_scores <= 0:
-            player.number_of_scores -= 3
-            # necessary to avoid finished players to change and del 1 or 2 and get 3 inputs (see: how is
-            # number_of_scores increased)
+        amount = determine_redo_amount(input_string, p)
+        hist_len = (len(p.history) + 2) % 3 + 1
+        if p == player or not p.strip_history(amount):
+            print("player must not be the current player and must already have played at least three (one/two "
+                  "respectively when optional argument 1 or 2 is used after the name) darts.")
+            return False
+        if amount >= hist_len:
+            p.number_of_scores = 3
+        wait_queue.insert(0, p)
         return True
     elif input_string.startswith("setwq"):
         new_wait_queue = []
         names = input_string.split()[1:]
         for name in names:
             p = find_player_with_name(wait_queue, name)
-            if len(set(names)) != len(set(wait_queue)):
-                print("too few or too many distinct names. setwq arguments must contain all names that are currently "
-                      "scheduled. use change to add a player that has finished to the wait queue.")
-                return False
             if p is None:
                 print("invalid name or contains player that has finished")
+                return False
+            elif len(set(names)) != len(set(wait_queue)):
+                print("too few or too many distinct names. setwq arguments must contain all names that are currently "
+                      "scheduled. use change to add a player that has finished to the wait queue.")
                 return False
             new_wait_queue.append(p)
         empty_list(wait_queue)
@@ -188,10 +204,10 @@ def special_input_action(input_string, player, wait_queue, players):
 # -----------------------Game Logic-----------------------
 
 
-def modify_wait_queue(wait_queue, player):
-    if not player.darts_left():
+def modify_wait_queue(wait_queue, player, skip):
+    if not player.darts_left() or skip:
         wait_queue.pop(0)
-        if player.remaining_score > 0 and find_player_with_name(wait_queue, player.name) is None:
+        if player.remaining_score > 0 and not contains(player, wait_queue):
             wait_queue.append(player)
 
 
@@ -199,7 +215,8 @@ def valid_move(player, remaining):
     if remaining < 0:
         print("too high")
         return False
-    if (remaining == 1 and player.require_double_finish) or (remaining == 0 and player.require_double_finish and player.temp[-1][-1:] != "d"):
+    if ((remaining == 1 and player.require_double_finish) or
+            (remaining == 0 and player.require_double_finish and player.temp[-1][-1:] != "d")):
         print("double finish required")
         return False
     return True
@@ -233,9 +250,11 @@ def game():
             special_input_action(input_string, player, wait_queue, players)
         elif regular_input_validation(player, input_string):
             play(player, regular_input_to_scores(input_string))
-            modify_wait_queue(wait_queue, player)
+            modify_wait_queue(wait_queue, player, False)
             if player.is_finished():
-                print(f"{player.name} has finished at position {list(map(lambda pl: pl.is_finished(), players)).count(True)} using {len(player.history)} darts.")
+                print(f"{player.name} has finished at position "
+                      f"{list(map(lambda pl: pl.is_finished(), players)).count(True)} "
+                      f"using {len(player.history)} darts.")
         else:
             print("Invalid")
 
