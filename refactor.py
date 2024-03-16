@@ -41,6 +41,34 @@ def count_darts_not_thrown(player, n):
     return amount_darts_not_thrown
 
 
+def print_help():
+    help_text = f"""------------------------------------------
+How to use: 
+Before a game starts, you will be asked to enter the following:
+--------------
+starting score: in the range of [1,infinity)
+--------------
+names of all players: all names seperated by a space. The game will adopt the order in which the names are listed.
+--------------
+During the game:
+To enter scores:
+<score> <score>[0-2 times: opt]: Enter at least one and up to three scores seperated by spaces. To enter doubles or trebles, follow the number by 'd' or 't' respectively, e.g. 25d 20t 10<enter>. A '.' is accepted as 2nd or 3rd score and indicates that the score before was scored again. If less than 3 scores are entered, you will be asked to enter the remaining scores in a new line.
+--------------
+To make adjustments:
+--------------
+end: removes current player from the game.
+--------------
+skip: skips the current player.
+--------------
+redo <player> <amount>[opt]: changes the current player to the specified player, deletes the last [amount|default: 3] scores and asks you to enter replacement for the deleted scores.
+--------------
+setwq <list of all names>: changes the order according to the provided list of players' names. List must include each player name currently in the wait queue exactly once. To include a player that is not currently playing, use redo before.
+--------------
+help: print this help text
+------------------------------------------"""
+    print(help_text)
+
+
 # -----------------------Utility-----------------------
 
 
@@ -162,7 +190,7 @@ def regular_input_to_scores(input_string):
 
 
 def special_input_validation(input_string):
-    regex = re.search(r"^(del\s+[1-9]\d*|end|skip|redo\s+.*(\s+[12])?|setwq\s+(.*)*)\s*$", input_string)
+    regex = re.search(r"^(del\s+[1-9]\d*|end\s*|skip\s*|redo\s+.*(\s+[12])?|setwq\s+(.*)*)\s*|help\s*$", input_string)
     return regex is not None
 
 
@@ -189,9 +217,9 @@ def special_input_action(input_string, player, wait_queue, players, state):
         print(f"skipping {player.name}")
         return True
     elif input_string.startswith("redo"):
-        if not state.allow_redo:
-            print("not allowed to use redo until the player that used it before has finished their redo")
-            return False
+        #if not state.allow_redo:
+        #   print("not allowed to use redo until the player that used it before has finished their redo")
+        #   return False
         name = input_string.split()[1]
         p = find_player_with_name(players, name)
         if p is None:
@@ -208,7 +236,7 @@ def special_input_action(input_string, player, wait_queue, players, state):
         elif amount == 1 and hist_len == 2:
             p.number_of_scores = 2
         wait_queue.insert(0, p)
-        state.allow_redo = False
+        # state.allow_redo = False
         return True
     elif input_string.startswith("setwq"):
         new_wait_queue = []
@@ -226,6 +254,9 @@ def special_input_action(input_string, player, wait_queue, players, state):
         empty_list(wait_queue)
         wait_queue.extend(new_wait_queue)
         return True
+    elif input_string.startswith("help"):
+        print_help()
+        return True
     return False
 
 
@@ -238,7 +269,7 @@ def update_state(state: State):
 
 def modify_wait_queue(wait_queue, player, skip, state):
     if not player.darts_left() or skip:
-        update_state(state)
+        # update_state(state)
         wait_queue.pop(0)
         if player.remaining_score == 0 and contains(player, wait_queue):
             wait_queue.remove(player)
@@ -279,12 +310,13 @@ def game():
     while len(wait_queue) > 0:
         # print(list(map(lambda pl: pl.name, wait_queue)))
         player = wait_queue[0]
-        if player.number_of_scores <= 0:
-            player.number_of_scores += 3
-        input_string = input(f"{player.name} [{player.remaining_score - sum_input(player.temp)}]: ").lstrip().rstrip()
+        input_string = input(f"{player.name} [{player.remaining_score - sum_input(player.temp)}]: " + f"{player.number_of_scores}: ").lstrip().rstrip()
         if special_input_validation(input_string):
             special_input_action(input_string, player, wait_queue, players, state)
-        elif regular_input_validation(player, input_string):
+            continue
+        if player.number_of_scores <= 0:
+            player.number_of_scores += 3
+        if regular_input_validation(player, input_string):
             play(player, regular_input_to_scores(input_string))
             modify_wait_queue(wait_queue, player, False, state)
             if player.is_finished():
