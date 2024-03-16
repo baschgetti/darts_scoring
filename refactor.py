@@ -25,8 +25,20 @@ def contains(element, search_list):
 def determine_redo_amount(input_string, player):
     amount = (len(player.history) + 2) % 3 + 1
     if len(input_string.split()) > 2:
-        amount = min(amount, int(input_string.split()[2]))
+        amount_darts_not_thrown = 0
+        for i in range(amount):
+            if player.history[-i] == "x":
+                amount_darts_not_thrown += 1
+        amount = min(amount, int(input_string.split()[2]) + count_darts_not_thrown(player, amount))
     return amount
+
+
+def count_darts_not_thrown(player, n):
+    amount_darts_not_thrown = 0
+    for i in range(n):
+        if player.history[-i] == "x":
+            amount_darts_not_thrown += 1
+    return amount_darts_not_thrown
 
 
 # -----------------------Utility-----------------------
@@ -65,11 +77,13 @@ class Player:
         if amount > temp_len + hist_len or amount == 0:
             return False
         self.temp = self.temp[:-min(amount, temp_len)]
+        count_x_darts = count_darts_not_thrown(self, amount - temp_len)
         if amount > temp_len:
             score_stripped = sum_input(self.history[-(amount - temp_len):])
             self.remaining_score += score_stripped
             self.history = self.history[:-(amount - temp_len)]
-        print(f"deleted last {amount} darts from history.")
+        print(f"deleted last {amount - count_x_darts} "
+              f"darts from history.")
         self.number_of_scores += max(0, amount - temp_len)
         return True
 
@@ -174,8 +188,10 @@ def special_input_action(input_string, player, wait_queue, players, state):
         modify_wait_queue(wait_queue, player, True, state)
         print(f"skipping {player.name}")
         return True
-    elif input_string.startswith("redo") and state.allow_redo:
-        print(state.allow_redo)
+    elif input_string.startswith("redo"):
+        if not state.allow_redo:
+            print("not allowed to use redo until the player that used it before has finished their redo")
+            return False
         name = input_string.split()[1]
         p = find_player_with_name(players, name)
         if p is None:
