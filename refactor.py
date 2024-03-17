@@ -19,18 +19,21 @@ def empty_list(list_empty):
 
 
 def contains(element, search_list):
-    return any(list(map(lambda e: e == element, search_list)))
+    # return any(list(map(lambda e: e == element, search_list)))
+    return search_list.count(element) > 0
 
 
-def determine_redo_amount(input_string, player):
-    amount = (len(player.history) + 2) % 3 + 1
-    if len(input_string.split()) > 2:
-        amount_darts_not_thrown = 0
-        for i in range(amount):
-            if player.history[-i] == "x":
-                amount_darts_not_thrown += 1
-        amount = min(amount, int(input_string.split()[2]) + count_darts_not_thrown(player, amount))
+def determine_redo_amount(player):
+    amount = (len(player.history) + len(player.temp) + 2) % 3 + 1
     return amount
+
+
+def count_invalid_darts_at_end(player, n):
+    invalid_darts_count = 0
+    for i in range(n):
+        if player.history[-i][-1:] == 'x':
+            invalid_darts_count += 1
+    return invalid_darts_count
 
 
 def count_darts_not_thrown(player, n):
@@ -48,25 +51,35 @@ Before a game starts, you will be asked to enter the following:
 --------------
 starting score: in the range of [1,infinity)
 --------------
-names of all players: all names seperated by a space. The game will adopt the order in which the names are listed.
+names of all players: all names seperated by spaces. The game will adopt the order in which the names are listed.
 --------------
 During the game:
 To enter scores:
-<score> <score>[0-2 times: opt]: Enter at least one and up to three scores seperated by spaces. To enter doubles or trebles, follow the number by 'd' or 't' respectively, e.g. 25d 20t 10<enter>. A '.' is accepted as 2nd or 3rd score and indicates that the score before was scored again. If less than 3 scores are entered, you will be asked to enter the remaining scores in a new line.
+<score> <score>[0-2 times: opt]: Enter at least one and up to three scores seperated by spaces. To enter doubles or trebles, follow the number by 'd' or 't' respectively, e.g. 25d 20t 10. Press Enter to confirm. A '.' is accepted as 2nd or 3rd score and indicates that the score before was scored again. If less than 3 scores are entered, you will be asked to enter the remaining scores in a new line.
 --------------
 To make adjustments:
 --------------
 end: removes current player from the game.
 --------------
+del: deletes one round of scores from the history of scores
+--------------
 skip: skips the current player.
 --------------
-redo <player> <amount>[opt]: changes the current player to the specified player, deletes the last [amount|default: 3] scores and asks you to enter replacement for the deleted scores.
+redo <player>: changes the current player to the specified player, deletes the scores of the last round and asks you to enter replacement for the deleted scores.
 --------------
 setwq <list of all names>: changes the order according to the provided list of players' names. List must include each player name currently in the wait queue exactly once. To include a player that is not currently playing, use redo before.
 --------------
 help: print this help text
 ------------------------------------------"""
     print(help_text)
+
+
+def redo_blocked(wait_queue):
+    return wait_queue.count(wait_queue[0]) > 1
+
+
+def setwq_blocked(wait_queue):
+    return redo_blocked(wait_queue)
 
 
 # -----------------------Utility-----------------------
@@ -106,13 +119,14 @@ class Player:
             return False
         self.temp = self.temp[:-min(amount, temp_len)]
         count_x_darts = count_darts_not_thrown(self, amount - temp_len)
-        if amount > temp_len:
-            score_stripped = sum_input(self.history[-(amount - temp_len):])
-            self.remaining_score += score_stripped
-            self.history = self.history[:-(amount - temp_len)]
+        # if amount > temp_len:
+        #    score_stripped = sum_input(self.history[-(amount - temp_len):])
+        #    self.remaining_score += score_stripped
+        #    self.history = self.history[:-(amount - temp_len)]
         print(f"deleted last {amount - count_x_darts} "
               f"darts from history.")
-        self.number_of_scores += max(0, amount - temp_len)
+        # self.number_of_scores += max(0, amount - temp_len)
+        self.number_of_scores += 3 if temp_len == 0 else 0
         return True
 
 
@@ -190,11 +204,12 @@ def regular_input_to_scores(input_string):
 
 
 def special_input_validation(input_string):
-    regex = re.search(r"^(del\s+[1-9]\d*|end\s*|skip\s*|redo\s+.*(\s+[12])?|setwq\s+(.*)*)\s*|help\s*$", input_string)
+    regex = re.search(r"^(del\s*$|end\s*$|skip\s*$|redo\s+.+\s*$|setwq\s+(.*)*)\s*$|help\s*$", input_string)
+    # |edit\s+.+\s+(sscore|name|req_double|num_scores)\s*$|info\s+.+\s*$
     return regex is not None
 
 
-def special_input_action(input_string, player, wait_queue, players, state):
+def special_input_action(input_string, player, wait_queue, players):
     if input_string == "":
         return True
     if input_string.startswith("end"):
@@ -204,7 +219,8 @@ def special_input_action(input_string, player, wait_queue, players, state):
               f"{player.start_score - sum_input(player.history)}")
         return True
     elif input_string.startswith("del"):
-        amount = int(input_string.split()[1])
+        # amount = int(input_string.split()[1])
+        amount = determine_redo_amount(player)
         if not player.strip_history(amount):
             print("invalid number")
             return False
@@ -213,42 +229,42 @@ def special_input_action(input_string, player, wait_queue, players, state):
         # TODO
         return True
     elif input_string.startswith("skip"):
-        modify_wait_queue(wait_queue, player, True, state)
+        modify_wait_queue(wait_queue, player, True)
         print(f"skipping {player.name}")
         return True
     elif input_string.startswith("redo"):
-        #if not state.allow_redo:
-        #   print("not allowed to use redo until the player that used it before has finished their redo")
-        #   return False
+        if redo_blocked(wait_queue):
+            print("not allowed to use redo until the player that used it before has finished their redo")
+            return False
         name = input_string.split()[1]
         p = find_player_with_name(players, name)
         if p is None:
             print("invalid name")
             return False
-        amount = determine_redo_amount(input_string, p)
-        hist_len = (len(p.history) + 2) % 3 + 1
+
+        amount = determine_redo_amount(p)
         if p == player or not p.strip_history(amount):
-            print("player must not be the current player and must already have played at least three (one/two "
-                  "respectively when optional argument 1 or 2 is used after the name) darts.")
+            print("player must not be the current player and must already have at least three darts in their score history")
             return False
-        if amount == hist_len:
-            p.number_of_scores = 3
-        elif amount == 1 and hist_len == 2:
-            p.number_of_scores = 2
         wait_queue.insert(0, p)
         # state.allow_redo = False
         return True
     elif input_string.startswith("setwq"):
+        if setwq_blocked(wait_queue):
+            print("not allowed to use setwq until the player that used redo before has finished their redo")
+            return False
         new_wait_queue = []
         names = input_string.split()[1:]
+
+        if len(set(names)) != len(set(wait_queue)):
+            print("too few or too many distinct names. setwq arguments must contain all names that are currently "
+                  "scheduled. use redo to add a player that has finished to the wait queue.")
+            return False
+
         for name in names:
             p = find_player_with_name(wait_queue, name)
             if p is None:
                 print("invalid name or contains player that has finished")
-                return False
-            elif len(set(names)) != len(set(wait_queue)):
-                print("too few or too many distinct names. setwq arguments must contain all names that are currently "
-                      "scheduled. use change to add a player that has finished to the wait queue.")
                 return False
             new_wait_queue.append(p)
         empty_list(wait_queue)
@@ -267,7 +283,7 @@ def update_state(state: State):
     state.allow_redo = True
 
 
-def modify_wait_queue(wait_queue, player, skip, state):
+def modify_wait_queue(wait_queue, player, skip):
     if not player.darts_left() or skip:
         # update_state(state)
         wait_queue.pop(0)
@@ -289,6 +305,7 @@ def valid_move(player, remaining):
 
 
 def play(player, scores):
+
     append = True
     player.temp += scores
     remaining = player.remaining_score - sum_input(player.temp)
@@ -304,7 +321,7 @@ def play(player, scores):
 
 
 def game():
-    state = State()
+    # state = State()
     start_score, players, wait_queue = setup()
 
     while len(wait_queue) > 0:
@@ -312,13 +329,13 @@ def game():
         player = wait_queue[0]
         input_string = input(f"{player.name} [{player.remaining_score - sum_input(player.temp)}]: " + f"{player.number_of_scores}: ").lstrip().rstrip()
         if special_input_validation(input_string):
-            special_input_action(input_string, player, wait_queue, players, state)
+            special_input_action(input_string, player, wait_queue, players)
             continue
         if player.number_of_scores <= 0:
             player.number_of_scores += 3
         if regular_input_validation(player, input_string):
             play(player, regular_input_to_scores(input_string))
-            modify_wait_queue(wait_queue, player, False, state)
+            modify_wait_queue(wait_queue, player, False)
             if player.is_finished():
                 print(f"{player.name} has finished at position "
                       f"{list(map(lambda pl: pl.is_finished(), players)).count(True)} "
