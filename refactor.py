@@ -28,14 +28,6 @@ def determine_redo_amount(player):
     return amount
 
 
-def count_invalid_darts_at_end(player, n):
-    invalid_darts_count = 0
-    for i in range(n):
-        if player.history[-i][-1:] == 'x':
-            invalid_darts_count += 1
-    return invalid_darts_count
-
-
 def count_darts_not_thrown(player, n):
     amount_darts_not_thrown = 0
     for i in range(n):
@@ -119,10 +111,10 @@ class Player:
             return False
         self.temp = self.temp[:-min(amount, temp_len)]
         count_x_darts = count_darts_not_thrown(self, amount - temp_len)
-        # if amount > temp_len:
-        #    score_stripped = sum_input(self.history[-(amount - temp_len):])
-        #    self.remaining_score += score_stripped
-        #    self.history = self.history[:-(amount - temp_len)]
+        if amount > temp_len:
+            score_stripped = sum_input(self.history[-(amount - temp_len):])
+            self.remaining_score += score_stripped
+            self.history = self.history[:-(amount - temp_len)]
         print(f"deleted last {amount - count_x_darts} "
               f"darts from history.")
         # self.number_of_scores += max(0, amount - temp_len)
