@@ -63,6 +63,12 @@ setwq <list of all names>: changes the order according to the provided list of p
 --------------
 info <name>: gives you information about given player
 --------------
+edit <name> <option>: edits properties of one player according to one of the following options:
+    sscore <new start score>: changes the start score to <new start score>
+    name <new name>: changes the name of the player to <new name>
+    reqDouble <False|True>: changes the game mode whether the player is required to finish with a Double
+    numScores <new num of scores>: changes the number of scores of the current player to <new num of scores>. <new num of scores> has to be divisible by 3.
+--------------
 help: print this help text
 ------------------------------------------"""
     print(help_text)
@@ -207,8 +213,7 @@ def regular_input_to_scores(input_string):
 
 
 def special_input_validation(input_string):
-    regex = re.search(r"^(del\s*$|end\s*$|skip\s*$|redo\s+.+\s*$|setwq\s+(.*)*)\s*$|help\s*$|info\s+.+\s*$", input_string)
-    # |edit\s+.+\s+(sscore|name|req_double|num_scores)\s*$
+    regex = re.search(r"^(del\s*$|end\s*$|skip\s*$|redo\s+.+\s*$|setwq\s+(.*)*)\s*$|help\s*$|info\s+.+\s*$|edit\s+.+\s+(sscore\s+[1-9]\d*|name\s+.+|reqDouble\s+(False|True)|numScores\s+\d+)\s*$", input_string)
     return regex is not None
 
 
@@ -276,6 +281,49 @@ def special_input_action(input_string, player, wait_queue, players):
             empty_list(wait_queue)
             wait_queue.extend(new_wait_queue)
             return True
+
+        case "edit":
+            p = find_player_with_name(players, input_string.split()[1])
+            if p is None:
+                print("no player with this name found")
+                return False
+            option = input_string.split()[2]
+            match option:
+                case "sscore":
+                    new_score = int(input_string.split()[3])
+                    curr_score = p.start_score - p.remaining_score + sum_input(p.temp)
+                    if new_score - 1 <= curr_score:
+                        print("new score too low")
+                        return False
+                    difference = p.start_score - new_score
+                    p.remaining_score -= difference
+                    p.start_score = new_score
+                    print(f"{p.name}'s start score changed to {p.start_score}. New remaining score is {p.remaining_score}")
+                    return True
+                case "name":
+                    new_name = input_string.split()[3]
+                    old_name = p.name
+                    p.name = new_name
+                    print(f"Player {old_name} has changed their name to {new_name}.")
+                    return True
+                case "reqDouble":
+                    req_double = True if input_string.split()[3] == "True" else False  # regex makes sure only False and True are valid inputs in the first place
+                    old_req_double = p.require_double_finish
+                    p.require_double_finish = req_double
+                    print(f"Player {p.name} has changed their game mode from requireDouble = {old_req_double} to {p.require_double_finish}.")
+                    return True
+                case "numScores":
+                    if p != player:
+                        print("Player has to be the current player")
+                        return False
+                    num_scores = int(input_string.split()[3])
+                    old_num_scores = p.number_of_scores
+                    if num_scores % 3 != 0:
+                        print("numScores must be divisible by 3")
+                        return False
+                    p.number_of_scores = num_scores
+                    print(f"Player {p.name} has changed their remaining scores from {3 if old_num_scores == 0 else old_num_scores} to {p.number_of_scores}.")
+                    return True
 
         case "info":
             p = find_player_with_name(players, input_string.split()[1])
