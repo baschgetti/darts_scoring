@@ -61,6 +61,8 @@ redo <player>: changes the current player to the specified player, deletes the s
 --------------
 setwq <list of all names>: changes the order according to the provided list of players' names. List must include each player name currently in the wait queue exactly once. To include a player that is not currently playing, use redo before.
 --------------
+info <name>: gives you information about given player
+--------------
 help: print this help text
 ------------------------------------------"""
     print(help_text)
@@ -120,6 +122,15 @@ class Player:
         # self.number_of_scores += max(0, amount - temp_len)
         self.number_of_scores += 3 if temp_len == 0 else 0
         return True
+
+    def print_info(self):
+        print(f"--------------\n"
+              f"Player {self.name}\n"
+              f"Remaining score: {self.remaining_score - sum_input(self.temp)}\n"
+              f"Are you required to score a double to end the game? {self.require_double_finish}\n"
+              f"Your score history: {self.history + self.temp}\n"
+              f"--------------")
+        return
 
 
 def append_temp_to_history(player, valid):
@@ -196,76 +207,89 @@ def regular_input_to_scores(input_string):
 
 
 def special_input_validation(input_string):
-    regex = re.search(r"^(del\s*$|end\s*$|skip\s*$|redo\s+.+\s*$|setwq\s+(.*)*)\s*$|help\s*$", input_string)
-    # |edit\s+.+\s+(sscore|name|req_double|num_scores)\s*$|info\s+.+\s*$
+    regex = re.search(r"^(del\s*$|end\s*$|skip\s*$|redo\s+.+\s*$|setwq\s+(.*)*)\s*$|help\s*$|info\s+.+\s*$", input_string)
+    # |edit\s+.+\s+(sscore|name|req_double|num_scores)\s*$
     return regex is not None
 
 
 def special_input_action(input_string, player, wait_queue, players):
     if input_string == "":
         return True
-    if input_string.startswith("end"):
-        wait_queue.pop(0)
-        append_temp_to_history(player, True)
-        print(f"{player.name} has chosen to withdraw with a remaining score of "
-              f"{player.start_score - sum_input(player.history)}")
-        return True
-    elif input_string.startswith("del"):
-        # amount = int(input_string.split()[1])
-        amount = determine_redo_amount(player)
-        if not player.strip_history(amount):
-            print("invalid number")
-            return False
-        return True
-    elif input_string.startswith("edit"):
-        # TODO
-        return True
-    elif input_string.startswith("skip"):
-        modify_wait_queue(wait_queue, player, True)
-        print(f"skipping {player.name}")
-        return True
-    elif input_string.startswith("redo"):
-        if redo_blocked(wait_queue):
-            print("not allowed to use redo until the player that used it before has finished their redo")
-            return False
-        name = input_string.split()[1]
-        p = find_player_with_name(players, name)
-        if p is None:
-            print("invalid name")
-            return False
+    command = input_string.split()[0]
+    match command:
+        case "end":
+            wait_queue.pop(0)
+            append_temp_to_history(player, True)
+            print(f"{player.name} has chosen to withdraw with a remaining score of "
+                  f"{player.start_score - sum_input(player.history)}")
+            return True
 
-        amount = determine_redo_amount(p)
-        if p == player or not p.strip_history(amount):
-            print("player must not be the current player and must already have at least three darts in their score history")
-            return False
-        wait_queue.insert(0, p)
-        # state.allow_redo = False
-        return True
-    elif input_string.startswith("setwq"):
-        if setwq_blocked(wait_queue):
-            print("not allowed to use setwq until the player that used redo before has finished their redo")
-            return False
-        new_wait_queue = []
-        names = input_string.split()[1:]
-
-        if len(set(names)) != len(set(wait_queue)):
-            print("too few or too many distinct names. setwq arguments must contain all names that are currently "
-                  "scheduled. use redo to add a player that has finished to the wait queue.")
-            return False
-
-        for name in names:
-            p = find_player_with_name(wait_queue, name)
-            if p is None:
-                print("invalid name or contains player that has finished")
+        case "del":
+            # amount = int(input_string.split()[1])
+            amount = determine_redo_amount(player)
+            if not player.strip_history(amount):
+                print("invalid number")
                 return False
-            new_wait_queue.append(p)
-        empty_list(wait_queue)
-        wait_queue.extend(new_wait_queue)
-        return True
-    elif input_string.startswith("help"):
-        print_help()
-        return True
-    return False
+            return True
+
+        case "skip":
+            modify_wait_queue(wait_queue, player, True)
+            print(f"skipping {player.name}")
+            return True
+
+        case "redo":
+            if redo_blocked(wait_queue):
+                print("not allowed to use redo until the player that used it before has finished their redo")
+                return False
+            name = input_string.split()[1]
+            p = find_player_with_name(players, name)
+            if p is None:
+                print("invalid name")
+                return False
+
+            amount = determine_redo_amount(p)
+            if p == player or not p.strip_history(amount):
+                print("player must not be the current player and must already have at least three darts in their score history")
+                return False
+            wait_queue.insert(0, p)
+            # state.allow_redo = False
+            return True
+
+        case "setwq":
+            if setwq_blocked(wait_queue):
+                print("not allowed to use setwq until the player that used redo before has finished their redo")
+                return False
+            new_wait_queue = []
+            names = input_string.split()[1:]
+
+            if len(set(names)) != len(set(wait_queue)):
+                print("too few or too many distinct names. setwq arguments must contain all names that are currently "
+                      "scheduled. use redo to add a player that has finished to the wait queue.")
+                return False
+
+            for name in names:
+                p = find_player_with_name(wait_queue, name)
+                if p is None:
+                    print("invalid name or contains player that has finished")
+                    return False
+                new_wait_queue.append(p)
+            empty_list(wait_queue)
+            wait_queue.extend(new_wait_queue)
+            return True
+
+        case "info":
+            p = find_player_with_name(players, input_string.split()[1])
+            if p is None:
+                print("no player with this name found")
+                return False
+            p.print_info()
+            return True
+
+        case "help":
+            print_help()
+            return True
+        case _:
+            return False
 
 
 # -----------------------Game Logic-----------------------
@@ -319,7 +343,7 @@ def game():
     while len(wait_queue) > 0:
         # print(list(map(lambda pl: pl.name, wait_queue)))
         player = wait_queue[0]
-        input_string = input(f"{player.name} [{player.remaining_score - sum_input(player.temp)}]: " + f"{player.number_of_scores}: ").lstrip().rstrip()
+        input_string = input(f"{player.name} [{player.remaining_score - sum_input(player.temp)}]: ").lstrip().rstrip()
         if special_input_validation(input_string):
             special_input_action(input_string, player, wait_queue, players)
             continue
@@ -333,7 +357,7 @@ def game():
                       f"{list(map(lambda pl: pl.is_finished(), players)).count(True)} "
                       f"using {len(player.history)} darts.")
         else:
-            print("Invalid")
+            print("Invalid input.")
 
     for p in players:
         print(f"{p.name} {p.history}")
