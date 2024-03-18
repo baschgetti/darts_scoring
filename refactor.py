@@ -82,8 +82,12 @@ info <name>: gives you information about given player
 edit <name> <option>: edits properties of one player according to one of the following options:
     sscore <new start score>: changes the start score to <new start score>
     name <new name>: changes the name of the player to <new name>
-    reqDouble <False|True>: changes the game mode whether the player is required to finish with a Double
+    reqDouble <False|True>: changes whether the player is required to finish with a Double
     numScores <new num of scores>: changes the number of scores of the current player to <new num of scores>. <new num of scores> has to be divisible by 3.
+--------------
+editg <option>: edits properties of all players currently scheduled in the wait_queue (= not finished) according to one of the following options:
+    sscore <new start score>: changes the start score to <new start score>
+    reqDouble <False|True>: changes whether the player is required to finish with a Double
 --------------
 help: print this help text
 ------------------------------------------"""
@@ -303,9 +307,9 @@ def special_input_action(input_string, player, wait_queue, players):
             match option:
                 case "sscore":
                     new_score = int(input_string.split()[2])
-                    if any(map(lambda pl: is_edit_start_score_forbidden(pl, new_score), players)):
+                    if any(map(lambda pl: is_edit_start_score_forbidden(pl, new_score), wait_queue)):
                         return False
-                    for p in players:
+                    for p in wait_queue:
                         edit_start_score(p, new_score)
                     return True
                 case "reqDouble":
