@@ -36,6 +36,22 @@ def count_darts_not_thrown(player, n):
     return amount_darts_not_thrown
 
 
+def is_edit_start_score_forbidden(player, new_score):
+    curr_score = player.start_score - player.remaining_score + sum_input(player.temp)
+    if new_score - 1 <= curr_score:
+        print("new score too low")
+        return True
+    return False
+
+
+# note that this not perform validity checks
+def edit_start_score(player, new_score):
+    difference = player.start_score - new_score
+    player.remaining_score -= difference
+    player.start_score = new_score
+    print(f"{player.name}'s start score changed to {player.start_score}. New remaining score is {player.remaining_score}")
+
+
 def print_help():
     help_text = f"""------------------------------------------
 How to use: 
@@ -213,7 +229,7 @@ def regular_input_to_scores(input_string):
 
 
 def special_input_validation(input_string):
-    regex = re.search(r"^(del\s*$|end\s*$|skip\s*$|redo\s+.+\s*$|setwq\s+(.*)*)\s*$|help\s*$|info\s+.+\s*$|edit\s+.+\s+(sscore\s+[1-9]\d*|name\s+.+|reqDouble\s+(False|True)|numScores\s+\d+)\s*$", input_string)
+    regex = re.search(r"^(del\s*$|end\s*$|skip\s*$|redo\s+.+\s*$|setwq\s+(.*)*)\s*$|help\s*$|info\s+.+\s*$|edit\s+.+\s+(sscore\s+[1-9]\d*|name\s+.+|reqDouble\s+(False|True)|numScores\s+\d+)\s*|editg\s+(sscore\s+[1-9]\d*|reqDouble\s+(False|True))\s*$", input_string)
     return regex is not None
 
 
@@ -282,6 +298,25 @@ def special_input_action(input_string, player, wait_queue, players):
             wait_queue.extend(new_wait_queue)
             return True
 
+        case "editg":
+            option = input_string.split()[1]
+            match option:
+                case "sscore":
+                    new_score = int(input_string.split()[2])
+                    if any(map(lambda pl: is_edit_start_score_forbidden(pl, new_score), players)):
+                        return False
+                    for p in players:
+                        edit_start_score(p, new_score)
+                    return True
+                case "reqDouble":
+                    req_double = True if input_string.split()[2] == "True" else False
+                    for p in wait_queue:
+                        p.require_double_finish = req_double
+                    print(f"game mode changed to requireDouble = {req_double} for all players.")
+                    return True
+                case _:
+                    return False
+
         case "edit":
             p = find_player_with_name(players, input_string.split()[1])
             if p is None:
@@ -291,14 +326,9 @@ def special_input_action(input_string, player, wait_queue, players):
             match option:
                 case "sscore":
                     new_score = int(input_string.split()[3])
-                    curr_score = p.start_score - p.remaining_score + sum_input(p.temp)
-                    if new_score - 1 <= curr_score:
-                        print("new score too low")
+                    if is_edit_start_score_forbidden(p, new_score):
                         return False
-                    difference = p.start_score - new_score
-                    p.remaining_score -= difference
-                    p.start_score = new_score
-                    print(f"{p.name}'s start score changed to {p.start_score}. New remaining score is {p.remaining_score}")
+                    edit_start_score(p, new_score)
                     return True
                 case "name":
                     new_name = input_string.split()[3]
