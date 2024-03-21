@@ -23,7 +23,7 @@ def contains(element, search_list):
     return search_list.count(element) > 0
 
 
-def determine_redo_amount(player):
+def get_redo_amount(player):
     amount = (len(player.history) + len(player.temp) + 2) % 3 + 1
     return amount
 
@@ -251,7 +251,7 @@ def special_input_action(input_string, player, wait_queue, players):
 
         case "del":
             # amount = int(input_string.split()[1])
-            amount = determine_redo_amount(player)
+            amount = get_redo_amount(player)
             if not player.strip_history(amount):
                 print("invalid number")
                 return False
@@ -272,12 +272,11 @@ def special_input_action(input_string, player, wait_queue, players):
                 print("invalid name")
                 return False
 
-            amount = determine_redo_amount(p)
+            amount = get_redo_amount(p)
             if p == player or not p.strip_history(amount):
                 print("player must not be the current player and must already have at least three darts in their score history")
                 return False
             wait_queue.insert(0, p)
-            # state.allow_redo = False
             return True
 
         case "setwq":
